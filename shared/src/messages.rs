@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::types::{Enemy, Player, Position, ScoreEntry};
+use crate::types::{Enemy, Player, Position, Projectile, ScoreEntry};
+use crate::upgrades::UpgradeType;
 
 /// Client → Server messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -11,6 +12,8 @@ pub enum ClientMessage {
     Join,
     /// Move player to a target position
     Move { target: Position },
+    /// Choose an upgrade after leveling up
+    ChooseUpgrade { upgrade: UpgradeType },
 }
 
 /// Server → Client messages
@@ -23,6 +26,7 @@ pub enum ServerMessage {
     GameState {
         players: Vec<Player>,
         enemies: Vec<Enemy>,
+        projectiles: Vec<Projectile>,
         game_time: f64,
     },
     /// Player death notification
@@ -35,6 +39,12 @@ pub enum ServerMessage {
     },
     /// Top scores
     Scoreboard { scores: Vec<ScoreEntry> },
+    /// Player leveled up - present upgrade choices
+    LevelUp {
+        player_id: Uuid,
+        new_level: u32,
+        upgrade_choices: Vec<UpgradeType>,
+    },
     /// Error message
     Error { message: String },
 }

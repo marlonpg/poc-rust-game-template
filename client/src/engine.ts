@@ -1,7 +1,7 @@
 import { GameClient } from "./network";
 import { GameRenderer } from "./renderer";
 import { InputHandler } from "./input";
-import { ServerMessage, Player, Enemy, ScoreEntry, Position } from "./protocol";
+import { ServerMessage, Player, Enemy, Projectile, ScoreEntry, Position } from "./protocol";
 import { logger } from "./logger";
 
 export class GameEngine {
@@ -12,6 +12,7 @@ export class GameEngine {
   private playerId: string | null = null;
   private players: Map<string, Player> = new Map();
   private enemies: Map<string, Enemy> = new Map();
+  private projectiles: Map<string, Projectile> = new Map();
   private scores: ScoreEntry[] = [];
 
   private gameConfig = {
@@ -44,6 +45,7 @@ export class GameEngine {
         case "GameState":
           this.players = new Map(message.players.map((p) => [p.id, p]));
           this.enemies = new Map(message.enemies.map((e) => [e.id, e]));
+          this.projectiles = new Map(message.projectiles.map((p) => [p.id, p]));
           if (this.playerId) {
             const myPlayer = this.players.get(this.playerId);
             if (myPlayer) {
@@ -112,7 +114,7 @@ export class GameEngine {
 
     if (direction.x !== 0 || direction.y !== 0) {
       // Keyboard movement
-      const speed = (currentPlayer.movement_speed || 5) * 2; // speed up client-directed moves
+      const speed = (currentPlayer.movement_speed || 5) * 10; // speed up client-directed moves
       const target = {
         x: currentPlayer.position.x + direction.x * speed,
         y: currentPlayer.position.y + direction.y * speed,
@@ -163,11 +165,13 @@ export class GameEngine {
 
     const playersArray = Array.from(this.players.values());
     const enemiesArray = Array.from(this.enemies.values());
+    const projectilesArray = Array.from(this.projectiles.values());
 
     this.renderer.drawGameState(
       currentPlayer.position,
       playersArray,
       enemiesArray,
+      projectilesArray,
       this.gameConfig.safeZoneRadius,
       this.gameConfig.ringRadius,
       this.gameConfig.maxRings

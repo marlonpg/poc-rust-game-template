@@ -68,6 +68,7 @@ async fn handle_socket(socket: WebSocket, state: SharedGameState) {
             let msg = ServerMessage::GameState {
                 players: game.players.values().cloned().collect(),
                 enemies: game.enemies.values().cloned().collect(),
+                projectiles: game.projectiles.values().cloned().collect(),
                 game_time: game.game_time,
             };
 
@@ -145,6 +146,14 @@ async fn handle_client_message(
                 let mut game = state.write().await;
                 let delta_time = 1.0 / game.config.tick_rate as f32;
                 game.move_player(pid, target, delta_time);
+            }
+        }
+        ClientMessage::ChooseUpgrade { upgrade } => {
+            if let Some(pid) = *player_id.read().await {
+                let mut game = state.write().await;
+                if let Err(e) = game.apply_upgrade(pid, upgrade) {
+                    tracing::error!("Failed to apply upgrade for player {}: {}", pid, e);
+                }
             }
         }
     }

@@ -29,7 +29,10 @@ pub async fn run_game_loop(state: SharedGameState) {
         // Update enemy AI
         game.update_enemies(delta_time);
 
-        // Process combat
+        // Update projectiles and collisions
+        game.update_projectiles(delta_time);
+
+        // Process combat (spawn projectiles)
         game.process_combat();
 
         // Could add state broadcasting here if needed

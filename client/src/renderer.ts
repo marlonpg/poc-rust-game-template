@@ -1,4 +1,4 @@
-import { Position, Enemy, EnemyType } from "./protocol";
+import { Position, Enemy, EnemyType, Projectile } from "./protocol";
 
 interface DrawContext {
   ctx: CanvasRenderingContext2D;
@@ -48,6 +48,7 @@ export class GameRenderer {
     playerPos: Position,
     players: { id: string; position: Position; health: number; max_health: number }[],
     enemies: Enemy[],
+    projectiles: Projectile[],
     safeZoneRadius: number,
     ringRadius: number,
     maxRings: number
@@ -67,6 +68,7 @@ export class GameRenderer {
 
     // Draw entities
     this.drawEnemies(drawCtx, enemies);
+    this.drawProjectiles(drawCtx, projectiles);
     this.drawPlayers(drawCtx, players, playerPos);
   }
 
@@ -227,6 +229,28 @@ export class GameRenderer {
     ctx.ctx.strokeStyle = "#fff";
     ctx.ctx.lineWidth = 1;
     ctx.ctx.strokeRect(x - width / 2, y, width, height);
+  }
+
+  private drawProjectiles(ctx: DrawContext, projectiles: Projectile[]) {
+    for (const proj of projectiles) {
+      const [screenX, screenY] = this.screenCoords(
+        proj.position.x,
+        proj.position.y,
+        ctx
+      );
+
+      // Draw projectile as bright yellow circle
+      const radius = 4 * ctx.scale;
+      ctx.ctx.fillStyle = "#ffff00";
+      ctx.ctx.beginPath();
+      ctx.ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
+      ctx.ctx.fill();
+
+      // Add a glow effect
+      ctx.ctx.strokeStyle = "#ffff00";
+      ctx.ctx.lineWidth = 2;
+      ctx.ctx.stroke();
+    }
   }
 
   private getEnemyRadius(type: EnemyType): number {

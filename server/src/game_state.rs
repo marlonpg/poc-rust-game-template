@@ -1,5 +1,5 @@
 use rand::Rng;
-use shared::{Enemy, EnemyType, Player, Position, ScoreEntry};
+use shared::{Enemy, EnemyType, Player, Position, Projectile, ScoreEntry, UpgradeType};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -14,9 +14,11 @@ pub struct GameState {
     pub config: GameConfig,
     pub players: HashMap<Uuid, Player>,
     pub enemies: HashMap<Uuid, Enemy>,
+    pub projectiles: HashMap<Uuid, Projectile>,
     pub scores: Vec<ScoreEntry>,
     pub game_time: f64,
     pub last_spawn_time: f64,
+    pub pending_level_ups: HashMap<Uuid, Vec<UpgradeType>>, // Player ID -> upgrade choices
 }
 
 impl GameState {
@@ -25,9 +27,11 @@ impl GameState {
             config,
             players: HashMap::new(),
             enemies: HashMap::new(),
+            projectiles: HashMap::new(),
             scores: Vec::new(),
             game_time: 0.0,
             last_spawn_time: 0.0,
+            pending_level_ups: HashMap::new(),
         }
     }
 
@@ -119,8 +123,8 @@ impl GameState {
     fn spawn_enemy_in_ring(&mut self, ring: u32) {
         let mut rng = rand::thread_rng();
 
-        // Choose random enemy type
-        let enemy_types = EnemyType::all();
+        // Choose ring-appropriate enemy type
+        let enemy_types = EnemyType::for_ring(ring);
         let enemy_type = enemy_types[rng.gen_range(0..enemy_types.len())];
 
         // Generate random position in the ring
@@ -137,8 +141,9 @@ impl GameState {
 
         self.enemies.insert(enemy_id, enemy);
         tracing::debug!(
-            "Spawned {:?} in ring {} at ({:.1}, {:.1})",
+            "Spawned {:?} (level {}) in ring {} at ({:.1}, {:.1})",
             enemy_type,
+            ring,
             ring,
             position.x,
             position.y
@@ -170,9 +175,11 @@ impl GameState {
 
     /// Process combat between players and enemies
     pub fn process_combat(&mut self) {
-        let combat_range = 50.0; // Attack range
+        let projectile_speed = 300.0; // units per second
+        let projectile_lifetime = 3.0; // seconds
+        let auto_attack_range = 400.0; // auto-aim range for Vampire Survivors style
 
-        // Players attack enemies
+        // Players spawn projectiles (auto-attack closest enemy)
         let player_ids: Vec<_> = self.players.keys().cloned().collect();
         for player_id in player_ids {
             let player = match self.players.get(&player_id) {
@@ -185,37 +192,46 @@ impl GameState {
                 continue;
             }
 
-            // Find closest enemy
-            if let Some((enemy_id, _)) = self
+            // Find closest enemy to auto-target
+            if let Some((_, enemy)) = self
                 .enemies
                 .iter()
                 .filter(|(_, e)| e.is_alive())
-                .map(|(id, e)| (id, e.position.distance_to(&player.position)))
-                .filter(|(_, dist)| *dist <= combat_range)
-                .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .map(|(id, e)| (id, e))
+                .min_by(|a, b| {
+                    let dist_a = a.1.position.distance_to(&player.position);
+                    let dist_b = b.1.position.distance_to(&player.position);
+                    dist_a.partial_cmp(&dist_b).unwrap()
+                })
             {
-                let enemy_id = *enemy_id;
-
-                // Apply damage
-                if let Some(enemy) = self.enemies.get_mut(&enemy_id) {
-                    enemy.take_damage(player.damage);
-
-                    if !enemy.is_alive() {
-                        tracing::debug!("Player {} killed enemy {}", player_id, enemy_id);
-                        if let Some(p) = self.players.get_mut(&player_id) {
-                            p.enemies_defeated += 1;
-                        }
+                let distance = enemy.position.distance_to(&player.position);
+                if distance <= auto_attack_range {
+                    // Spawn projectile toward enemy
+                    let direction = Position::new(
+                        enemy.position.x - player.position.x,
+                        enemy.position.y - player.position.y,
+                    );
+                    
+                    let projectile = Projectile::new(
+                        player_id,
+                        player.position,
+                        direction,
+                        projectile_speed,
+                        player.damage,
+                        projectile_lifetime,
+                    );
+                    
+                    self.projectiles.insert(projectile.id, projectile);
+                    
+                    // Update attack cooldown
+                    if let Some(p) = self.players.get_mut(&player_id) {
+                        p.last_attack_time = self.game_time;
                     }
-                }
-
-                // Update attack cooldown
-                if let Some(p) = self.players.get_mut(&player_id) {
-                    p.last_attack_time = self.game_time;
                 }
             }
         }
 
-        // Enemies attack players
+        // Enemies attack players (keep melee)
         let enemy_ids: Vec<_> = self.enemies.keys().cloned().collect();
         for enemy_id in enemy_ids {
             let enemy = match self.enemies.get(&enemy_id) {
@@ -231,7 +247,8 @@ impl GameState {
                     }
 
                     let distance = enemy.position.distance_to(&target_player.position);
-                    if distance <= combat_range {
+                    let melee_range = 50.0;
+                    if distance <= melee_range {
                         // Apply damage
                         if let Some(player) = self.players.get_mut(&target_id) {
                             player.take_damage(enemy.damage);
@@ -254,6 +271,102 @@ impl GameState {
         self.enemies.retain(|_, e| e.is_alive());
 
         // Dead players will be removed when connection drops
+    }
+
+    /// Update projectiles and check collisions
+    pub fn update_projectiles(&mut self, delta_time: f32) {
+        let collision_radius = 20.0; // hit detection radius
+
+        // Update projectile positions
+        for projectile in self.projectiles.values_mut() {
+            projectile.update(delta_time);
+        }
+
+        // Check collisions with enemies
+        let projectile_ids: Vec<_> = self.projectiles.keys().cloned().collect();
+        for proj_id in projectile_ids {
+            let projectile = match self.projectiles.get(&proj_id) {
+                Some(p) => p.clone(),
+                None => continue,
+            };
+
+            // Find hit enemy
+            if let Some((enemy_id, _)) = self
+                .enemies
+                .iter()
+                .filter(|(_, e)| e.is_alive())
+                .map(|(id, e)| (id, e.position.distance_to(&projectile.position)))
+                .filter(|(_, dist)| *dist <= collision_radius)
+                .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            {
+                let enemy_id = *enemy_id;
+
+                // Get XP reward before killing enemy
+                let xp_reward = self.enemies.get(&enemy_id).map(|e| e.xp_reward).unwrap_or(0);
+
+                // Apply damage
+                if let Some(enemy) = self.enemies.get_mut(&enemy_id) {
+                    enemy.take_damage(projectile.damage);
+
+                    if !enemy.is_alive() {
+                        tracing::debug!("Projectile from player {} killed enemy {}", projectile.owner_id, enemy_id);
+                        if let Some(p) = self.players.get_mut(&projectile.owner_id) {
+                            p.enemies_defeated += 1;
+                            // Grant XP to player
+                            let leveled_up = p.grant_xp(xp_reward);
+                            if leveled_up {
+                                tracing::info!("Player {} leveled up to {}", projectile.owner_id, p.level);
+                                // Generate upgrade choices
+                                let choices = UpgradeType::random_choices(&[]);
+                                self.pending_level_ups.insert(projectile.owner_id, choices);
+                            }
+                        }
+                    }
+                }
+
+                // Remove projectile on hit
+                self.projectiles.remove(&proj_id);
+            }
+        }
+
+        // Remove expired projectiles
+        self.projectiles.retain(|_, p| p.is_alive());
+    }
+
+    /// Apply a chosen upgrade to a player
+    pub fn apply_upgrade(&mut self, player_id: Uuid, upgrade: UpgradeType) -> Result<(), String> {
+        // Remove pending level up
+        self.pending_level_ups.remove(&player_id);
+
+        let player = self.players.get_mut(&player_id)
+            .ok_or_else(|| "Player not found".to_string())?;
+
+        player.upgrades.apply_upgrade(upgrade);
+
+        // Apply stat changes immediately based on upgrade type
+        match upgrade {
+            UpgradeType::IncreaseDamage => {
+                player.damage = 10.0 * player.upgrades.damage_multiplier();
+            },
+            UpgradeType::IncreaseAttackSpeed => {
+                player.attack_speed = 1.0 * player.upgrades.attack_speed_multiplier();
+            },
+            UpgradeType::IncreaseMovementSpeed => {
+                player.movement_speed = 120.0 * player.upgrades.movement_speed_multiplier();
+            },
+            UpgradeType::IncreaseMaxHealth => {
+                let old_max = player.max_health;
+                player.max_health = 100.0 * (1.0 + player.upgrades.max_health_level as f32 * 0.25);
+                // Heal the difference
+                player.health += player.max_health - old_max;
+            },
+            _ => {
+                // Other upgrades are passive or handled elsewhere
+            }
+        }
+
+        tracing::info!("Player {} chose upgrade: {:?}", player_id, upgrade);
+        Ok(())
     }
 
     /// Add a score entry to the leaderboard
