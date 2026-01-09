@@ -1,6 +1,105 @@
 # Rust Game Backend — Setup
 
-This guide sets up a reliable Rust development environment for building a game backend. Choose the section for your OS.
+This project is a server-authoritative multiplayer action roguelike game built in Rust with a TypeScript web client. See [REQUIREMENTS.md](REQUIREMENTS.md) for full game design and [ARCHITECTURE.md](ARCHITECTURE.md) for technical details.
+
+## Quick Start
+
+### Prerequisites
+- Rust toolchain (stable)
+- Node.js 18+ and npm
+- MSVC Build Tools (Windows) or build-essential (Linux)
+
+### 1. Start Server
+```bash
+cargo run --bin server
+```
+
+Server runs on `0.0.0.0:3000`
+
+### 2. Start Client (in another terminal)
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Client opens on `http://localhost:5173`
+
+### Play the Game
+- **WASD** to move
+- **Click** to move to cursor
+- Auto-attack activates outside safe zone
+- Survive waves, reach Ring 10+ to qualify for scoreboard
+
+## Project Structure
+
+```
+poc-rust-game-template/
+├── server/              # Rust game backend
+│   ├── src/
+│   ├── Cargo.toml
+│   └── README.md
+├── shared/              # Shared Rust types
+│   ├── src/
+│   └── Cargo.toml
+├── client/              # TypeScript web client
+│   ├── src/
+│   ├── package.json
+│   └── README.md
+├── .gitignore
+├── Cargo.toml
+├── REQUIREMENTS.md
+├── ARCHITECTURE.md
+└── README.md
+```
+
+## Documentation
+
+- **[Server Architecture](ARCHITECTURE.md)** — Backend design and mechanics
+- **[Game Requirements](REQUIREMENTS.md)** — Game design document
+- **[Client README](client/README.md)** — Client usage
+- **[Client Development](client/DEVELOPMENT.md)** — Client development guide
+- **[Project Status](PROJECT_STATUS.md)** — Completion checklist
+
+## Build and Test
+
+### Server
+```bash
+# Build
+cargo build
+
+# Run
+cargo run --bin server
+
+# Test
+cargo test --all
+
+# Release build
+cargo build --release
+```
+
+### Client
+```bash
+cd client
+
+# Install
+npm install
+
+# Development
+npm run dev
+
+# Build
+npm run build
+
+# Type check
+npm run type-check
+```
+
+---
+
+## Environment Setup
+
+This guide sets up a reliable Rust development environment for building the game backend. Choose the section for your OS.
 
 ## Windows Setup
 

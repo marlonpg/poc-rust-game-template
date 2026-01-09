@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Client</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        font-family: Arial, sans-serif;
+        background: #1a1a1a;
+        color: #fff;
+      }
+
+      #app {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #canvas {
+        display: block;
+        background: #000;
+        flex: 1;
+      }
+
+      #ui {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 10;
+        font-size: 14px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 4px;
+        min-width: 200px;
+      }
+
+      #stats {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .stat-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      #health-bar {
+        width: 150px;
+        height: 20px;
+        background: #333;
+        border: 1px solid #666;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      #health-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #00ff00, #ffff00);
+        transition: width 0.1s;
+      }
+
+      #connection-status {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid #666;
+      }
+
+      #connection-status.connected {
+        border-color: #00ff00;
+        color: #00ff00;
+      }
+
+      #connection-status.connecting {
+        border-color: #ffff00;
+        color: #ffff00;
+      }
+
+      #connection-status.disconnected {
+        border-color: #ff0000;
+        color: #ff0000;
+      }
+
+      #scoreboard {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        max-width: 300px;
+        max-height: 400px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid #666;
+        border-radius: 4px;
+        padding: 10px;
+        font-size: 12px;
+        overflow-y: auto;
+      }
+
+      #scoreboard h3 {
+        margin-bottom: 5px;
+        font-size: 14px;
+      }
+
+      .score-entry {
+        padding: 3px 0;
+        border-bottom: 1px solid #333;
+      }
+
+      #instructions {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        max-width: 250px;
+      }
+
+      #instructions h4 {
+        margin-bottom: 5px;
+      }
+
+      #instructions p {
+        margin: 3px 0;
+        line-height: 1.4;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="canvas"></canvas>
+
+      <div id="ui">
+        <div id="stats">
+          <div class="stat-line">
+            <span>HP:</span>
+            <div id="health-bar">
+              <div id="health-fill"></div>
+            </div>
+          </div>
+          <div class="stat-line">
+            <span>Ring:</span>
+            <span id="ring-value">1</span>
+          </div>
+          <div class="stat-line">
+            <span>Enemies:</span>
+            <span id="enemies-value">0</span>
+          </div>
+          <div class="stat-line">
+            <span>Time:</span>
+            <span id="time-value">0s</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="connection-status" class="disconnected">Disconnected</div>
+
+      <div id="instructions">
+        <h4>Controls</h4>
+        <p>WASD - Move</p>
+        <p>Click - Move to cursor</p>
+        <p>Auto-attack outside safe zone</p>
+      </div>
+
+      <div id="scoreboard">
+        <h3>Top Scores</h3>
+        <div id="scores-list"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
