@@ -1,0 +1,35 @@
+# Rust build output
+/target/
+**/*.rs.bk
+
+# Profiles & coverage artifacts
+*.profraw
+*.profdata
+*.gcno
+*.gcda
+coverage/
+
+# Logs
+*.log
+
+# Environment files (secrets)
+.env
+.env.*
+
+# Editor/OS files
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary/backup files
+*.tmp
+*.swp
+*.swo
+*~
+*.bak
+
+# Local test project created during setup verification
+/_rust-check/
